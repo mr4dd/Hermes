@@ -11,9 +11,11 @@ def test_and_prime_model(system_prompt: str, model: str = "llama3.2-vision:11b")
         messages=[
             {
                 "role":"system",
-                "content":system_prompt
+                "content":system_prompt,
             }
-        ])
+        ],
+        think=False
+        )
 
 def query_model_with_image(system_prompt: str, prompt: str, image_path: str, model: str = "llama3.2-vision:11b") -> str:
     
@@ -26,6 +28,7 @@ def query_model_with_image(system_prompt: str, prompt: str, image_path: str, mod
             },
             {"role": "user", "content": prompt, "images": [image_path]},
         ],
+        think=False
     )
 
     output = response.message.content

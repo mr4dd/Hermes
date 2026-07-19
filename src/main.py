@@ -21,11 +21,13 @@ class ContextManager():
     def __exit__(self):
         self.con.close()
 
-    def save_classifications(self, filename: str, hash: str, description: str) -> bool:
-        if not filename or not description or not hash:
+    def save_classifications(self, path: str, hash: str, description: str) -> bool:
+        if not path or not description or not hash:
             raise ValueError
+        
+        filename: str = path.split("/")[-1]
         try:
-            self.cur.execute("INSERT INTO classifications(filename, hash, description) VALUES(%s, %s, %s)", (filename, hash, description))
+            self.cur.execute("INSERT INTO classifications(filename, hash, description) VALUES(?, ?, ?)", (filename, hash, description))
         except Exception as e:
             print(e)
             return False
@@ -63,7 +65,7 @@ def main(args: argparse.Namespace):
             file,
             "gemma4:12b"
             )
-        print(sql_ctx.save_classifications(file, hash, response))
+        sql_ctx.save_classifications(file, hash, response)
     sql_ctx.cur.execute("commit")
 
 
