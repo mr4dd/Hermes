@@ -25,6 +25,8 @@ def main(args: argparse.Namespace):
     if not args.database:
         raise ValueError
     sql_ctx = ContextManager(args.database)
+    env_vars: dict = load_env.get_env()
+    init_sql.init(sql_ctx.cur)
 
 
 if __name__ == "__main__":
