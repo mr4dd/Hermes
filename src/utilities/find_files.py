@@ -6,6 +6,6 @@ def files(directory: str) -> list:
     for root, dirs, files in walk(directory):
         for file in files:
             ext = file.split(".")[-1]
-            if ext in extensions:
+            if any(e in ext for e in extensions):
                 file_list.append(path.join(root, file))
     return file_list
