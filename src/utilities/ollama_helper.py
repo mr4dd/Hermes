@@ -3,6 +3,7 @@ import ollama
 def test_and_prime_model(system_prompt: str, model: str = "llama3.2-vision:11b"):
     local_models = {m.model for m in ollama.list().models}
     if model not in local_models:
+        print("Couldn't find the specified model, downloading now...")
         ollama.pull(model)
     
     ollama.chat(
