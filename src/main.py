@@ -1,7 +1,10 @@
-from utilities import load_env, init_sql
+from utilities import load_env, init_sql, find_files, ollama_helper
 from sys import argv
 import sqlite3
 import argparse
+from hashlib import sha256
+import tqdm
+from os.path import exists
 
 class ContextManager():
     def __init__(self, database_file: str):
@@ -18,11 +21,11 @@ class ContextManager():
     def __exit__(self):
         self.con.close()
 
-    def save_classifications(self, cur: sqlite3.Cursor, filename: str, hash: str, description: str) -> bool:
+    def save_classifications(self, filename: str, hash: str, description: str) -> bool:
         if not filename or not description or not hash:
             raise ValueError
         try:
-            cur.execute("INSERT INTO classifications(filename, hash, description) VALUES(%s, %s, %s)", (filename, hash, description))
+            self.cur.execute("INSERT INTO classifications(filename, hash, description) VALUES(%s, %s, %s)", (filename, hash, description))
         except Exception as e:
             print(e)
             return False
@@ -32,9 +35,36 @@ class ContextManager():
 def main(args: argparse.Namespace):
     if not args.database:
         raise ValueError
+    
     sql_ctx = ContextManager(args.database)
     env_vars: dict = load_env.get_env()
     init_sql.init(sql_ctx.cur)
+    ollama_helper.test_and_prime_model(
+        env_vars.get("system_prompt") or "describe what's in the image in as much detail as possible",
+        "gemma4:12b")
+
+    files = find_files.files(args.dir)
+    pbar = tqdm.tqdm(files)
+    sql_ctx.cur.execute("begin transaction")
+    for file in pbar:
+        if not exists(file):
+            print(f"file {file} does not exist")
+            continue 
+        hash: str = ""
+        try:
+            with open(file, "rb") as fd:
+                hash = str(sha256(fd.read()).digest())
+        except PermissionError:
+            print(f"Unable to open file {file} due to insufficient permissions")
+
+        response: str = ollama_helper.query_model_with_image(
+            env_vars.get("system_prompt") or "describe what's in the image in as much detail as possible",
+            "Describe this image",
+            file,
+            "gemma4:12b"
+            )
+        print(sql_ctx.save_classifications(file, hash, response))
+    sql_ctx.cur.execute("commit")
 
 
 if __name__ == "__main__":
@@ -49,6 +79,6 @@ if __name__ == "__main__":
 
     try:
         main(args)
-    except ValueError:
-        print("database argument not provided")
+    except Exception as e:
+        print("Unknown exception occured: ", e)
         exit()
