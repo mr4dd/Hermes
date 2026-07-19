@@ -29,7 +29,7 @@ class ContextManager():
         try:
             self.cur.execute("INSERT INTO classifications(filename, hash, description) VALUES(?, ?, ?)", (filename, hash, description))
         except Exception as e:
-            print(e)
+            print(f"an error occured while processing file {filename}: ", e)
             return False
         return True
 
@@ -65,6 +65,7 @@ def main(args: argparse.Namespace):
             file,
             "gemma4:12b"
             )
+        
         sql_ctx.save_classifications(file, hash, response)
     sql_ctx.cur.execute("commit")
 
