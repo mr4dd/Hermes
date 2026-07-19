@@ -18,8 +18,16 @@ class ContextManager():
     def __exit__(self):
         self.con.close()
 
-    def save_classifications(self, filename: str, hash: str, description: str):
-        pass
+    def save_classifications(self, cur: sqlite3.Cursor, filename: str, hash: str, description: str) -> bool:
+        if not filename or not description or not hash:
+            raise ValueError
+        try:
+            cur.execute("INSERT INTO classifications(filename, hash, description) VALUES(%s, %s, %s)", (filename, hash, description))
+        except Exception as e:
+            print(e)
+            return False
+        return True
+
 
 def main(args: argparse.Namespace):
     if not args.database:
