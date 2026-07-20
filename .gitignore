@@ -1,3 +1,4 @@
 TODO.md
 venv
-.env
+*.env
+*.db
