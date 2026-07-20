@@ -59,14 +59,17 @@ def main(args: argparse.Namespace):
         except PermissionError:
             print(f"Unable to open file {file} due to insufficient permissions")
 
-        response: str = ollama_helper.query_model_with_image(
-            env_vars.get("system_prompt") or "describe what's in the image in as much detail as possible",
-            "Describe this image",
-            file,
-            "gemma4:12b"
-            )
-        
-        sql_ctx.save_classifications(file, hash, response)
+        try:
+            response: str = ollama_helper.query_model_with_image(
+                env_vars.get("system_prompt") or "describe what's in the image in as much detail as possible",
+                "Describe this image",
+                file,
+                "gemma4:12b"
+                )
+            
+            sql_ctx.save_classifications(file, hash, response)
+        except Exception as e:
+            print(e)
     sql_ctx.cur.execute("commit")
 
 
