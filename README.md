@@ -40,19 +40,17 @@ The system performs the following workflow:
    pip install -r requirements.txt
    ```
 
+3. Run Hermes:
+
+    ```bash
+    python src/main.py --database <path_to_db> --dir <path_to_images> --model <model_name>
+    ```
+
 ## Configuration
 
 The system uses environment variables for configuration. You can set these in a `.env` file or directly in your shell environment:
 
 - `SYSTEM_PROMPT`: The instructions given to the model (e.g., "describe what's in the image in as much detail as possible").
-
-## Usage
-
-To run the classification and embedding pipeline, use the following command:
-
-```bash
-python main.py --database <path_to_db> --dir <path_to_images> --model <model_name>
-```
 
 ### Arguments:
 
