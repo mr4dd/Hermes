@@ -76,6 +76,9 @@ def main(args: argparse.Namespace):
     if not args.database:
         logger.error("Database argument was not provided")
         raise ValueError("database argument not provided")
+    if not args.dir:
+        logger.error("Image directory argument was not provided")
+        raise ValueError("Image directory argument not provided")
 
     sql_ctx = ContextManager(args.database)
     env_vars: dict = load_env.get_env()
@@ -85,7 +88,7 @@ def main(args: argparse.Namespace):
     logger.info("Priming Ollama model")
     ollama_helper.test_and_prime_model(
         env_vars.get("system_prompt") or "describe what's in the image in as much detail as possible",
-        "gemma4:12b",
+        args.model,
     )
 
     files = find_files.files(args.dir)
@@ -113,7 +116,7 @@ def main(args: argparse.Namespace):
                 env_vars.get("system_prompt") or "describe what's in the image in as much detail as possible",
                 "Describe this image",
                 file,
-                "gemma4:12b",
+                args.model,
             )
             logger.debug("Received model response length %s for %s", len(response), file)
 
@@ -132,11 +135,12 @@ def main(args: argparse.Namespace):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        prog="Prometheus",
+        prog="Hermes",
         description="Image classifier based on python and ollama",
     )
     parser.add_argument("--database")
     parser.add_argument("--dir")
+    parser.add_argument("--model", default="llama3.2-vision:11b")
     args: argparse.Namespace = parser.parse_args()
 
     try:
