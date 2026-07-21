@@ -1,4 +1,11 @@
-from utilities import load_env, init_sql, find_files, ollama_helper, embeddings_helper
+from utilities import (
+    load_env,
+    init_sql,
+    find_files,
+    ollama_helper,
+    embeddings_helper,
+    search_result_print
+)
 import argparse
 import logging
 import sqlite3
@@ -157,19 +164,51 @@ def main(args: argparse.Namespace):
 
     embed_descriptions(sql_ctx)
 
+def search(args: argparse.Namespace):
+    if not args.database:
+        logger.error("Database argument was not provided")
+        raise ValueError("database argument not provided")
+    if not args.dir:
+        logger.error("Image directory argument was not provided")
+        raise ValueError("Image directory argument not provided")
+
+    results: list[int] = []
+    sql_ctx = ContextManager(args.database)
+    embedding: bytes = embeddings_helper.generate_embedding(args.search)
+    stored_embeddings: list = sql_ctx.cur.execute("SELECT * FROM embeddings").fetchall()
+
+    for embed in stored_embeddings:
+        similarity: float = embeddings_helper.cosign_similarity_compare(embedding, embed[2])
+        if similarity >= 0.31:
+            results.append(embed[1])
+
+    files: list[tuple[str, str]] = []
+    if results:
+        placeholders = ",".join("?" for _ in results)
+        files = sql_ctx.cur.execute(
+            f"SELECT filename, description FROM classifications WHERE id IN ({placeholders})",
+            results,
+        ).fetchall()
+
+    return files
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         prog="Hermes",
         description="Image classifier based on python and ollama",
     )
-    parser.add_argument("--database")
-    parser.add_argument("--dir")
+    parser.add_argument("--database", help="database file to store descriptions and embeddings")
+    parser.add_argument("--dir", help="directory to index")
     parser.add_argument("--model", default="llama3.2-vision:11b")
+    parser.add_argument("--search", help="search for a specific file, only works after running the indexer")
     args: argparse.Namespace = parser.parse_args()
 
     try:
-        main(args)
+        if args.search:
+            search_result_print.print_search_results(search(args))
+        else:
+            main(args)
     except Exception as e:
         logger.exception("Unhandled exception during classifier run")
         exit(1)
