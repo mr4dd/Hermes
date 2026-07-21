@@ -88,9 +88,10 @@ def embed_descriptions(sql_ctx: ContextManager):
     )
 
     embedded_count = 0
+    helper = embeddings_helper.Helper()
     for classification_id, description in tqdm.tqdm(sql_ctx.cur, total=total):
         logger.debug("Embedding description for classification id %s", classification_id)
-        embedding: bytes = embeddings_helper.generate_embedding(description=description)
+        embedding: bytes = helper.generate_embedding(description=description)
         write_cursor.execute("INSERT INTO embeddings(classification_id, embedding) VALUES(?,?)", (classification_id, embedding,))
         sql_ctx.con.commit()
         embedded_count += 1
@@ -174,11 +175,12 @@ def search(args: argparse.Namespace):
 
     results: list[int] = []
     sql_ctx = ContextManager(args.database)
-    embedding: bytes = embeddings_helper.generate_embedding(args.search)
+    helper = embeddings_helper.Helper()
+    embedding: bytes = helper.generate_embedding(args.search)
     stored_embeddings: list = sql_ctx.cur.execute("SELECT * FROM embeddings").fetchall()
 
     for embed in stored_embeddings:
-        similarity: float = embeddings_helper.cosign_similarity_compare(embedding, embed[2])
+        similarity: float = helper.cosign_similarity_compare(embedding, embed[2])
         if similarity >= 0.31:
             results.append(embed[1])
 
