@@ -2,6 +2,7 @@ from sentence_transformers import SentenceTransformer
 import numpy as np
 
 def generate_embedding(description: str) -> bytes:
+    # TODO: evaluate better embeddings models, im thinking all-mpnet-base-v2
     model = SentenceTransformer('all-MiniLM-L6-v2')
     vector = model.encode(description)
     return vector.astype('float32').tobytes()
