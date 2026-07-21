@@ -53,12 +53,32 @@ class ContextManager():
 
 def embed_descriptions(sql_ctx: ContextManager):
     logger.info("Starting embedding step for stored descriptions")
-    sql_ctx.cur.execute("SELECT COUNT(*) FROM classifications")
+    sql_ctx.cur.execute(
+        """
+        SELECT COUNT(*)
+        FROM classifications c
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM embeddings e
+            WHERE e.classification_id = c.id
+        )
+        """
+    )
     total: int = sql_ctx.cur.fetchone()[0]
     logger.info("Found %s classifications to embed", total)
     write_cursor: sqlite3.Cursor = sql_ctx.con.cursor()
 
-    sql_ctx.cur.execute("SELECT id, description FROM classifications")
+    sql_ctx.cur.execute(
+        """
+        SELECT id, description
+        FROM classifications c
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM embeddings e
+            WHERE e.classification_id = c.id
+        )
+        """
+    )
 
     embedded_count = 0
     for classification_id, description in tqdm.tqdm(sql_ctx.cur, total=total):
@@ -109,6 +129,11 @@ def main(args: argparse.Namespace):
                 hash = str(sha256(fd.read()).digest())
         except PermissionError:
             logger.exception("Unable to open file due to insufficient permissions: %s", file)
+            continue
+
+        sql_ctx.cur.execute("SELECT 1 FROM classifications WHERE hash = ? LIMIT 1", (hash,))
+        if sql_ctx.cur.fetchone():
+            logger.info("Skipping %s because its hash already exists in the database", file)
             continue
 
         try:
