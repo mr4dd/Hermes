@@ -173,7 +173,7 @@ def search(args: argparse.Namespace):
         logger.error("Image directory argument was not provided")
         raise ValueError("Image directory argument not provided")
 
-    results: list[int] = []
+    results: list[tuple[int, float]] = []
     sql_ctx = ContextManager(args.database)
     helper = embeddings_helper.Helper()
     embedding: bytes = helper.generate_embedding(args.search)
@@ -182,14 +182,17 @@ def search(args: argparse.Namespace):
     for embed in stored_embeddings:
         similarity: float = helper.cosign_similarity_compare(embedding, embed[2])
         if similarity >= 0.31:
-            results.append(embed[1])
+            results.append((embed[1], similarity))
+
+    results.sort(key=lambda item: item[1], reverse=True)
 
     files: list[tuple[str, str]] = []
     if results:
-        placeholders = ",".join("?" for _ in results)
+        classification_ids = [classification_id for classification_id, _ in results]
+        placeholders = ",".join("?" for _ in classification_ids)
         files = sql_ctx.cur.execute(
             f"SELECT filename, description FROM classifications WHERE id IN ({placeholders})",
-            results,
+            classification_ids,
         ).fetchall()
 
     return files
