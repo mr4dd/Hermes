@@ -51,7 +51,7 @@ class ContextManager():
         logger.debug("Saving classification for file %s", filename)
         try:
             self.cur.execute("INSERT INTO classifications(filename, hash, description) VALUES(?, ?, ?)", (filename, hash, description))
-            logger.info("Saved classification for %s", filename)
+            #logger.info("Saved classification for %s", filename)
         except Exception as e:
             logger.exception("Failed to save classification for %s", filename)
             return False
@@ -158,6 +158,13 @@ def main(args: argparse.Namespace):
                 processed_count += 1
             else:
                 logger.warning("Classification save failed for %s", file)
+
+            if processed_count == 20:
+                sql_ctx.cur.execute("commit")
+                sql_ctx.cur.execute("begin transaction")
+                logger.info("Committed 20 entries to database.")
+                processed_count = 0
+            
         except Exception as e:
             logger.exception("Unexpected error while processing %s", file)
     sql_ctx.cur.execute("commit")

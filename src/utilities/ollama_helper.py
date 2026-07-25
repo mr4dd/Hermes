@@ -14,6 +14,9 @@ def test_and_prime_model(system_prompt: str, model: str = "llama3.2-vision:11b")
                 "content":system_prompt,
             }
         ],
+        options={
+            "num_ctx":8192
+        },
         think=False
         )
 
@@ -28,8 +31,11 @@ def query_model_with_image(system_prompt: str, prompt: str, image_path: str, mod
             },
             {"role": "user", "content": prompt, "images": [image_path]},
         ],
+        options={
+                    "num_ctx":8192
+        },
         think=False
     )
 
-    output = response.message.content
+    output = response.message.content or ""
     return output
