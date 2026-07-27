@@ -158,15 +158,17 @@ def main(args: argparse.Namespace):
                 processed_count += 1
             else:
                 logger.warning("Classification save failed for %s", file)
-
-            if processed_count == 20:
-                sql_ctx.cur.execute("commit")
-                sql_ctx.cur.execute("begin transaction")
-                logger.info("Committed 20 entries to database.")
-                processed_count = 0
             
         except Exception as e:
-            logger.exception("Unexpected error while processing %s", file)
+            logger.exception("Unexpected error while processing %s, saving with empty description", file)
+            saved = sql_ctx.save_classifications(file, hash, '')
+
+        if processed_count == 20:
+            sql_ctx.cur.execute("commit")
+            sql_ctx.cur.execute("begin transaction")
+            logger.info("Committed 20 entries to database.")
+            processed_count = 0
+
     sql_ctx.cur.execute("commit")
     logger.info("Committed database transaction. Processed %s files", processed_count)
 
