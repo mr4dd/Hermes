@@ -9,9 +9,8 @@ from utilities import (
 import argparse
 import logging
 import sqlite3
-import traceback
 from hashlib import sha256
-from os.path import exists
+from os.path import exists, isfile
 
 import tqdm
 
@@ -104,9 +103,9 @@ def main(args: argparse.Namespace):
     if not args.database:
         logger.error("Database argument was not provided")
         raise ValueError("database argument not provided")
-    if not args.dir:
-        logger.error("Image directory argument was not provided")
-        raise ValueError("Image directory argument not provided")
+    if not args.dir and not args.file:
+        logger.error("Image directory or file argument was not provided")
+        raise ValueError("Image directory or file argument not provided")
 
     sql_ctx = ContextManager(args.database)
     env_vars: dict = load_env.get_env()
@@ -118,8 +117,11 @@ def main(args: argparse.Namespace):
         env_vars.get("system_prompt") or "describe what's in the image in as much detail as possible",
         args.model,
     )
-
-    files = find_files.files(args.dir)
+    files: list = []
+    if isfile(args.file):
+        files.append(args.file)
+    else:
+        files = find_files.files(args.dir)
     logger.info("Discovered %s files to process from %s", len(files), args.dir)
     pbar = tqdm.tqdm(files)
     sql_ctx.cur.execute("begin transaction")
@@ -178,9 +180,6 @@ def search(args: argparse.Namespace):
     if not args.database:
         logger.error("Database argument was not provided")
         raise ValueError("database argument not provided")
-    if not args.dir:
-        logger.error("Image directory argument was not provided")
-        raise ValueError("Image directory argument not provided")
 
     results: list[tuple[int, float]] = []
     sql_ctx = ContextManager(args.database)
@@ -216,6 +215,7 @@ if __name__ == "__main__":
     parser.add_argument("--dir", help="directory to index")
     parser.add_argument("--model", default="llama3.2-vision:11b")
     parser.add_argument("--search", help="search for a specific file, only works after running the indexer")
+    parser.add_argument("--file", help="single file to be processed")
     args: argparse.Namespace = parser.parse_args()
 
     try:
