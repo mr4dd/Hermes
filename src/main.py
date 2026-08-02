@@ -11,6 +11,7 @@ import logging
 import sqlite3
 from hashlib import sha256
 from os.path import exists, isfile
+from pathlib import Path
 
 import tqdm
 
@@ -118,7 +119,7 @@ def main(args: argparse.Namespace):
         args.model,
     )
     files: list = []
-    if isfile(args.file):
+    if args.file and isfile(args.file):
         files.append(args.file)
     else:
         files = find_files.files(args.dir)
@@ -202,6 +203,9 @@ def search(args: argparse.Namespace):
             f"SELECT filename, description FROM classifications WHERE id IN ({placeholders})",
             classification_ids,
         ).fetchall()
+
+    sql_ctx.cur.close()
+    sql_ctx.con.close()
 
     return files
 
