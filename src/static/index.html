@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Classifier - Gallery</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <div class="gallery-container">
+        <div class="image-grid" id="imageGrid">
+        </div>
+
+        
+    </div>
+    <div class="search-overlay">
+            <div class="glass-container">
+                <input type="text" id="mainSearch" placeholder="Search images, labels, or metadata..." />
+                <button id="searchBtn">Search</button>
+            </div>
+    </div>
+    <div class="image-expanded" hidden>
+        <img id="expanded-image" src="" alt="Expanded View" height="auto" width="auto">
+        <div class="image-info">
+            <p id="image-description"></p>
+        </div>
+        <button id="close-btn">X</button>
+    </div>
+    <script src="/static/js/gallery.js"></script>
+    
+</body>
+</html>

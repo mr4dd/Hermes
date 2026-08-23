@@ -1,7 +1,7 @@
 import shutil
 
 
-def print_search_results(results: list[tuple[str, str]]) -> None:
+def print_search_results(results: list[tuple[str, str, float]]) -> None:
     if not results:
         print("No results found")
         return
@@ -9,14 +9,18 @@ def print_search_results(results: list[tuple[str, str]]) -> None:
     terminal_width = shutil.get_terminal_size((80, 20)).columns
     description_width = max(20, terminal_width - 20)
 
-    headers = ("#", "File", "Description")
-    rows = [(index, filename, description) for index, (filename, description) in enumerate(results, start=1)]
+    headers = ("#", "File", "Similarity", "Description")
+    rows = [
+        (index, filename, similarity, description)
+        for index, (filename, description, similarity) in enumerate(results, start=1)
+    ]
 
-    file_width = max(10, min(30, max(len(str(filename)) for _, filename, _ in rows)))
+    file_width = max(10, min(30, max(len(str(filename)) for _, filename, _, _ in rows)))
     column_widths = [len(header) for header in headers]
     column_widths[1] = max(column_widths[1], file_width)
-    max_description_length = max(len(str(description)) for _, _, description in rows)
-    column_widths[2] = max(column_widths[2], min(description_width, max_description_length))
+    max_description_length = max(len(str(description)) for _, _, _, description in rows)
+    column_widths[2] = max(column_widths[2], len("0.000"))
+    column_widths[3] = max(column_widths[3], min(description_width, max_description_length))
 
     def wrap_text(text: str, width: int) -> list[str]:
         words = text.split()
@@ -41,7 +45,7 @@ def print_search_results(results: list[tuple[str, str]]) -> None:
     def format_row(values: tuple[object, ...]) -> str:
         rendered = []
         for index, value in enumerate(values):
-            if index == 2:
+            if index == 3:
                 rendered.append(str(value))
             else:
                 rendered.append(str(value).ljust(column_widths[index]))
@@ -52,11 +56,16 @@ def print_search_results(results: list[tuple[str, str]]) -> None:
     print(format_row(headers))
     print("-" * (sum(column_widths) + 3 * (len(headers) - 1)))
 
-    for _, filename, description in rows:
-        wrapped_description = wrap_text(description, column_widths[2])
-        print(format_row((_, filename, wrapped_description[0])))
+    for _, filename, similarity, description in rows:
+        wrapped_description = wrap_text(description, column_widths[3])
+        print(format_row((_, filename, f"{similarity:.3f}", wrapped_description[0])))
         for extra_line in wrapped_description[1:]:
-            print("  | ".join(["".ljust(len(str(_))), "".ljust(column_widths[1]), extra_line]))
+            print("  | ".join([
+                "".ljust(len(str(_))),
+                "".ljust(column_widths[1]),
+                "".ljust(column_widths[2]),
+                extra_line,
+            ]))
 
     print("=" * (sum(column_widths) + 3 * (len(headers) - 1)))
     print()

@@ -4,7 +4,7 @@ from utilities import (
     find_files,
     ollama_helper,
     embeddings_helper,
-    search_result_print
+    search_result_print,
 )
 import argparse
 import logging
@@ -14,6 +14,11 @@ from os.path import exists, isfile
 from pathlib import Path
 
 import tqdm
+
+import fastapi
+from fastapi.staticfiles import StaticFiles
+import uvicorn
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -89,12 +94,14 @@ def embed_descriptions(sql_ctx: ContextManager):
 
     embedded_count = 0
     helper = embeddings_helper.Helper()
+
     for classification_id, description in tqdm.tqdm(sql_ctx.cur, total=total):
-        logger.debug("Embedding description for classification id %s", classification_id)
-        embedding: bytes = helper.generate_embedding(description=description)
-        write_cursor.execute("INSERT INTO embeddings(classification_id, embedding) VALUES(?,?)", (classification_id, embedding,))
-        sql_ctx.con.commit()
+        chunks = description.split(".")
+        for chunk in chunks:
+            embedding: bytes = helper.generate_embedding(chunk)
+            write_cursor.execute("INSERT INTO embeddings(classification_id, embedding) VALUES(?,?)", (classification_id, embedding,))
         embedded_count += 1
+    sql_ctx.con.commit()
 
     write_cursor.close()
     logger.info("Completed embedding step for %s classifications", embedded_count)
@@ -182,33 +189,103 @@ def search(args: argparse.Namespace):
         logger.error("Database argument was not provided")
         raise ValueError("database argument not provided")
 
-    results: list[tuple[int, float]] = []
     sql_ctx = ContextManager(args.database)
     helper = embeddings_helper.Helper()
     embedding: bytes = helper.generate_embedding(args.search)
     stored_embeddings: list = sql_ctx.cur.execute("SELECT * FROM embeddings").fetchall()
+    best_scores: dict[int, float] = {}
 
     for embed in stored_embeddings:
         similarity: float = helper.cosign_similarity_compare(embedding, embed[2])
-        if similarity >= 0.31:
-            results.append((embed[1], similarity))
+        if similarity >= 0.4:
+            classification_id = embed[1]
+            best_scores[classification_id] = max(
+                best_scores.get(classification_id, 0.0),
+                similarity,
+            )
 
-    results.sort(key=lambda item: item[1], reverse=True)
+    results = sorted(best_scores.items(), key=lambda item: item[1], reverse=True)
 
-    files: list[tuple[str, str]] = []
+    files: list[tuple[str, str, float]] = []
     if results:
         classification_ids = [classification_id for classification_id, _ in results]
         placeholders = ",".join("?" for _ in classification_ids)
-        files = sql_ctx.cur.execute(
-            f"SELECT filename, description FROM classifications WHERE id IN ({placeholders})",
-            classification_ids,
-        ).fetchall()
+        files_by_id = {
+            classification_id: (filename, description)
+            for classification_id, filename, description in sql_ctx.cur.execute(
+                f"SELECT id, filename, description FROM classifications WHERE id IN ({placeholders})",
+                classification_ids,
+            ).fetchall()
+        }
+        files = [
+            (*files_by_id[classification_id], similarity)
+            for classification_id, similarity in results
+            if classification_id in files_by_id
+        ]
+
+    deduped_files: list[tuple[str, str, float]] = []
+    files_by_filename: dict[str, tuple[str, float]] = {}
+    for filename, description, similarity in files:
+        if filename in files_by_filename:
+            existing_description, existing_similarity = files_by_filename[filename]
+            if description and existing_description:
+                description = f"{existing_description} | {description}"
+            elif description:
+                description = description
+            else:
+                description = existing_description
+            files_by_filename[filename] = (
+                description,
+                max(existing_similarity, similarity),
+            )
+        else:
+            files_by_filename[filename] = (description or "", similarity)
+
+    deduped_files = [
+        (filename, description, similarity)
+        for filename, (description, similarity) in files_by_filename.items()
+    ]
+    deduped_files.sort(key=lambda item: item[2], reverse=True)
 
     sql_ctx.cur.close()
     sql_ctx.con.close()
 
-    return files
 
+    return deduped_files
+
+
+def serve_api(args: argparse.Namespace):
+    if not args.database:
+        logger.error("Database argument was not provided")
+        raise ValueError("database argument not provided")
+
+    sql_ctx: ContextManager = ContextManager(args.database)
+
+    app = fastapi.FastAPI()
+    static_dir = Path(__file__).resolve().parent / "static"
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+    @app.get("/api/search")
+    async def search_endpoint(query: str):
+        results = search(argparse.Namespace(database=args.database, search=query))
+        images = [
+            {"filename": filename, "description": description, "similarity": similarity}
+            for filename, description, similarity in results
+        ]
+        return {"images": images}
+
+    @app.get("/api/images")
+    async def get_images(query: str | None = '0'):
+        sql_ctx.cur.execute("SELECT * FROM classifications WHERE id > ? LIMIT 20", (query,))
+        images = sql_ctx.cur.fetchall()
+        images = [{"id": img[0], "filename": img[1], "description": img[3]} for img in images]
+        return {"images": images}
+
+    @app.get("/")
+    async def root():
+        return fastapi.responses.FileResponse(static_dir / "index.html")
+
+    uvicorn.run(app, host="127.0.0.1", port=8000)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -220,11 +297,14 @@ if __name__ == "__main__":
     parser.add_argument("--model", default="llama3.2-vision:11b")
     parser.add_argument("--search", help="search for a specific file, only works after running the indexer")
     parser.add_argument("--file", help="single file to be processed")
+    parser.add_argument("--serve", action="store_true", help="run the API server")
     args: argparse.Namespace = parser.parse_args()
 
     try:
         if args.search:
             search_result_print.print_search_results(search(args))
+        elif args.serve:
+            serve_api(args)
         else:
             main(args)
     except Exception as e:
