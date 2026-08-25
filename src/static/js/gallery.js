@@ -44,7 +44,7 @@ function displayImages(images) {
 
         const imgElement = document.createElement('img');
         imgElement.src = placeholderSrc;
-        imgElement.dataset.src = `http://192.168.100.2:8000/${image.filename}`;
+        imgElement.dataset.src = `http://localhost:8080/${image.filename}`;
         imgElement.alt = image.description || 'Image';
         imgElement.loading = 'lazy';
         imgElement.classList.add('gallery-image');
